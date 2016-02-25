@@ -174,7 +174,7 @@ static void wrapup(void) {
 static int get_utc(struct connection *c) {
     time_t t;
     t = time(NULL);
-    return strftime(c->con_time, MAXBUF, "%Y-%m-%d %H:%M:%S", gmtime(&t));
+    return strftime(c->con_time, MAXBUF, "%Y-%m-%d@%H:%M:%S", gmtime(&t));
 }
 
 /****

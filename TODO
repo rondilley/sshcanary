@@ -3,10 +3,10 @@ difftree TODO list
 
 Short-term:
 -----------
-* port to MinGW
-* add support for fts instead of nftw
+* Log client offered public keys
+* chroot() support with syslog
 
 Long-term:
 ----------
-* add checksumming of file saved with -w
-* add client/server functionality
+* Analysis of attackers over time
+* analysis of dictionaties over time
