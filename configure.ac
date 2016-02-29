@@ -184,9 +184,6 @@ AC_HEADER_STDBOOL
 
 dnl ############## Function checks
 
-AC_FUNC_CLOSEDIR_VOID
-AC_FUNC_LSTAT
-AC_FUNC_MEMCMP
 AC_CHECK_FUNCS([strtoul])
 AC_CHECK_FUNCS([bzero])
 AC_CHECK_FUNCS([getpwuid])
@@ -199,15 +196,11 @@ AC_CHECK_FUNCS([strdup])
 AC_CHECK_FUNCS([gethostname])
 AC_CHECK_FUNCS([opendir])
 AC_CHECK_FUNCS([fstat])
-AC_CHECK_FUNCS([ftw])
-AC_CHECK_FUNCS([nftw],echo "nftw() found",echo "nftw() not found - using noftw()")
 AC_CHECK_FUNCS([strncat])
 AC_CHECK_FUNCS([strlcat])
 AC_CHECK_FUNCS([snprintf])
 AC_CHECK_FUNCS([setrlimit])
-AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
+AC_CHECK_FUNCS([ftruncate]) 
 AC_CHECK_FUNCS([realpath])
 AC_CHECK_FUNCS([strstr])
 AC_CHECK_FUNCS([utime])
@@ -216,6 +209,12 @@ AC_CHECK_FUNCS([alarm])
 AC_CHECK_FUNCS([endgrent])
 AC_CHECK_FUNCS([strerror])
 AC_CHECK_FUNCS([strtol])
+AC_FUNC_CLOSEDIR_VOID
+AC_FUNC_LSTAT
+AC_FUNC_MEMCMP
+AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
 AC_FUNC_FORK
 AC_FUNC_WAIT3
 
