@@ -31,6 +31,10 @@
 
 #define MIN_PORT 0
 #define MAX_PORT 65535
+#define MD5_HASH_LEN 16
+#define SHA1_HASH_LEN 20
+#define MD5_HASH_STR_LEN 33
+#define SHA1_HASH_STR_LEN 41
 
 /****
  *
@@ -87,6 +91,7 @@ static void wrapup(void);
 static int get_utc(struct connection *c);
 static int *get_client_ip(struct connection *c);
 static int log_attempt(struct connection *c, int message_type);
+char *hash2hex(const unsigned char *hash, char *hashStr, int hLen ) ;
 
 int handle_auth(ssh_session session);
 

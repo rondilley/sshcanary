@@ -206,7 +206,11 @@ static int *get_client_ip(struct connection *c) {
 static int log_attempt(struct connection *c, int message_type ) {
     FILE *f;
     int r;
-
+    ssh_key tmp_ssh_key;
+    unsigned char *tmp_hash = NULL;
+    size_t tmp_hlen;
+    char tmp_buf[SHA1_HASH_STR_LEN];
+    
     /* XXX only open the file once */
     if ((f = fopen(config->log_file, "a+")) == NULL) {
         display( LOG_ERR, "Unable to open %s", config->log_file );
@@ -226,12 +230,32 @@ static int log_attempt(struct connection *c, int message_type ) {
     c->user = ssh_message_auth_user(c->message);
     if ( message_type EQ SSH_AUTH_METHOD_PASSWORD ) {
         c->pass = ssh_message_auth_password(c->message);
-        r = fprintf( f, "date=%s ip=%s user=%s pw=%s\n", c->con_time, c->client_ip, c->user, c->pass );
+        if ( config->trap ) {
+            //if ( ( rand() % 10 ) EQ 1 ) {
+            display( LOG_DEBUG, "Trap: %d", rand() % 10 );
+#ifdef DEBUG
+                if ( config->debug > 6 )
+                    display( LOG_DEBUG, "Trap set" );
+#endif
+                r = fprintf( f, "date=%s ip=%s user=%s pw=%s trap\n", c->con_time, c->client_ip, c->user, c->pass );
+                ssh_message_auth_reply_success( c->message, 0 );
+            //}
+        } else
+            r = fprintf( f, "date=%s ip=%s user=%s pw=%s\n", c->con_time, c->client_ip, c->user, c->pass );
+            
     } else if ( message_type EQ SSH_AUTH_METHOD_PUBLICKEY ) {
-        r = fprintf( f, "date=%s ip=%s user=%s key=%s\n", c->con_time, c->client_ip, c->user, ssh_message_auth_pubkey(c->message) );        
+        tmp_ssh_key = ssh_message_auth_pubkey( c->message );
+#ifdef DEBUG
+        if ( config->debug >= 3 )
+            display( LOG_DEBUG, "Client presented a %s key", ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ) );
+#endif
+            
+        if ( ssh_get_publickey_hash( tmp_ssh_key, SSH_PUBLICKEY_HASH_SHA1, &tmp_hash, &tmp_hlen ) < 0 )
+            display( LOG_ERR, "Unable to generate hash of public key" );
+        else {
+            r = fprintf( f, "date=%s ip=%s user=%s keytype=%s key=sha1:%s\n", c->con_time, c->client_ip, c->user, ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ), hash2hex( tmp_hash, tmp_buf, tmp_hlen ) );
+        }
     }
-    
-    fclose(f);
     return r;
 }
 
@@ -240,7 +264,8 @@ static int log_attempt(struct connection *c, int message_type ) {
 int handle_auth(ssh_session session) {
     struct connection con;
     con.session = session;
-
+    ssh_gssapi_creds tmp_gssapi_creds;
+    
     /* Perform key exchange. */
     if (ssh_handle_key_exchange(con.session)) {
         display( LOG_ERR, "Error exchanging keys: [%s]", ssh_get_error(con.session));
@@ -255,41 +280,75 @@ int handle_auth(ssh_session session) {
     /* Wait for a message, which should be an authentication attempt. Send the default
      * reply if it isn't. Log the attempt and quit. */
     while (1) {
-        if ((con.message = ssh_message_get(con.session)) EQ NULL) {
+        if ( ( con.message = ssh_message_get( con.session ) ) EQ NULL ) {
             break;
         }
 
-        // ssh_gssapi_creds ssh_gssapi_get_creds	(	ssh_session 	session	)	
+        switch ( ssh_message_type( con.message ) ) {
+          case SSH_REQUEST_AUTH:
+                
+            // SSH_AUTH_METHOD_UNKNOWN 0
+            // SSH_AUTH_METHOD_NONE 0x0001
+            // SSH_AUTH_METHOD_PASSWORD 0x0002
+            // SSH_AUTH_METHOD_PUBLICKEY 0x0004
+            // SSH_AUTH_METHOD_HOSTBASED 0x0008
+            // SSH_AUTH_METHOD_INTERACTIVE 0x0010
+            // SSH_AUTH_METHOD_GSSAPI_MIC 0x0020
 
-        /* Log the authentication request and disconnect. */
-        if ( ssh_message_subtype(con.message) EQ SSH_AUTH_METHOD_PASSWORD ) {
-            log_attempt(&con, ssh_message_subtype(con.message));
-        } else if ( ssh_message_subtype(con.message) EQ SSH_AUTH_METHOD_PUBLICKEY ) {
-            // XXX need to extract pub key, convert to human readable hash and print
-           // tmpSshKeyPtr = ssh_message_auth_pubkey( con.message );
-           // ssh_key_dup()
-           //log_attempt(&con, ssh_message_subtype(con.message));
+            /* Log the authentication request and disconnect. */
+                
+            switch( ssh_message_subtype( con.message ) ) {
+              case SSH_AUTH_METHOD_PASSWORD:
+              case SSH_AUTH_METHOD_PUBLICKEY:
+                log_attempt( &con, ssh_message_subtype( con.message ) );
+                break;
+                        
+              case SSH_AUTH_METHOD_NONE:
+                display( LOG_INFO, "Client tried to connect without authenticating" );
+                break;
+                        
+              case SSH_AUTH_METHOD_GSSAPI_MIC:
+                if ( ( tmp_gssapi_creds = ssh_gssapi_get_creds( con.session ) ) != NULL ) {
+                    /* client forwarded a token */
+                    display( LOG_INFO, "Client forwarded a token" );
+                }
+                break;
+                        
+              default:
+                display( LOG_INFO, "SSH Message Sub-Type: %d", ssh_message_subtype( con.message ) );
+#ifdef DEBUG
+                if ( config->debug >= 1 )
+                    display( LOG_DEBUG, "Not a password authentication attempt");
+#endif
+                break;
+            }
+            break;
+
+          case SSH_REQUEST_CHANNEL_OPEN:
+              display( LOG_INFO, "Client sent channel open message" );
+              break;
+              
+          case SSH_REQUEST_CHANNEL:
+              display( LOG_INFO, "Client sent channel message" );
+              break;
+              
+          case SSH_REQUEST_SERVICE:
+              display( LOG_INFO, "Client sent service message" );
+              break;
+              
+          case SSH_REQUEST_GLOBAL:
+              display( LOG_INFO, "Client sent global message" );
+              break;
+              
+          default:
+            display( LOG_INFO, "SSH Message Type: %d", ssh_message_type( con.message ) );
+            break;
         }
         
-        // SSH_AUTH_METHOD_UNKNOWN 0
-        // SSH_AUTH_METHOD_NONE 0x0001
-        // SSH_AUTH_METHOD_PASSWORD 0x0002
-        // SSH_AUTH_METHOD_PUBLICKEY 0x0004
-        // SSH_AUTH_METHOD_HOSTBASED 0x0008
-        // SSH_AUTH_METHOD_INTERACTIVE 0x0010
-        // SSH_AUTH_METHOD_GSSAPI_MIC 0x0020
-
-        else {
-            display( LOG_INFO, "SSH Message Sub-Type: %d", ssh_message_subtype(con.message) );
-#ifdef DEBUG
-            if ( config->debug >= 1 )
-                display( LOG_DEBUG, "Not a password authentication attempt");
-#endif
-        }
-
         /* Send the default message regardless of the request type. */
-        ssh_message_reply_default(con.message);
-        ssh_message_free(con.message);
+        
+        ssh_message_reply_default( con.message );
+        ssh_message_free( con.message );
     }
 
 #ifdef DEBUG
@@ -298,4 +357,28 @@ int handle_auth(ssh_session session) {
 #endif
     
     return 0;
+}
+
+/****
+ *
+ * convert hash to hex
+ *
+ ****/
+
+char *hash2hex(const unsigned char *hash, char *hashStr, int hLen ) {
+  int i;
+  char hByte[3];
+  bzero( hByte, sizeof( hByte ) );
+        hashStr[0] = 0;
+
+  for( i = 0; i < hLen; i++ ) {
+    snprintf( hByte, sizeof(hByte), "%02x", hash[i] & 0xff );
+#ifdef HAVE_STRNCAT
+    strncat( hashStr, hByte, hLen*2 );
+#else
+    strlcat( hashStr, hByte, hLen*2 );
+#endif
+  }
+
+  return hashStr;
 }

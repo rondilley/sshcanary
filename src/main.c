@@ -131,14 +131,15 @@ int main(int argc, char *argv[]) {
       {"listen", required_argument, 0, 'L' },
       {"pid", required_argument, 0, 'P' },
       {"port", required_argument, 0, 'p' },
+      {"trap", no_argument, 0, 't' },
       {"user", required_argument, 0, 'u' },
       {"group", required_argument, 0, 'g' },
       {"version", no_argument, 0, 'v' },
       {0, no_argument, 0, 0}
     };
-    c = getopt_long(argc, argv, "c:dD:hk:l:L:P:p:u:g:v", long_options, &option_index);
+    c = getopt_long(argc, argv, "c:d:Dhk:l:L:P:p:tu:g:v", long_options, &option_index);
 #else
-    c = getopt( argc, argv, "c:dD:hk:l:L:P:p:u:g:v" );
+    c = getopt( argc, argv, "c:d:Dhk:l:L:P:p:tu:g:v" );
 #endif
 
     if (c EQ -1)
@@ -208,6 +209,12 @@ int main(int argc, char *argv[]) {
 
       break;
       
+    case 't':
+      /* enable traps (random auth success messages) */
+      config->trap = TRUE;
+        
+      break;
+        
     case 'u':
 
       /* set user to run as */
@@ -350,7 +357,9 @@ int main(int argc, char *argv[]) {
       umask( 0027 );
 
       /* stir randoms if used */
-
+      srand((unsigned int)**main + (unsigned int)&argc + (unsigned int)time(NULL));
+      srand(rand());
+      
       /* done forking off */
 
       /* enable syslog */

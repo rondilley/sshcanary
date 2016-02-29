@@ -1,9 +1,9 @@
-.TH DT 1  "29 December 2015" "dt @VERSION@" "dt @VERSION@"
+.TH DT 1  "28 February 2016" "sshcanaryd @VERSION@" "sshcanaryd @VERSION@"
 .SH NAME
-dt \- Diff directory tree.
+dt \- SSH Canary.
 .SH SYNOPSIS
 .na
-.B dt
+.B sshcanaryd
 [
 .B \-ahmpqsv
 ] [

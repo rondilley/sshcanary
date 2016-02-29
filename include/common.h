@@ -105,6 +105,7 @@ typedef struct {
   int debug;
   int quick;
   int mode;
+  int trap;
   int facility;
   int priority;
   int tcpPort;
