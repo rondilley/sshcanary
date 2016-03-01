@@ -322,10 +322,12 @@ int handle_auth(ssh_session session) {
                 break;
                         
               case SSH_AUTH_METHOD_GSSAPI_MIC:
+#ifdef HAVE_SSH_GSSAPI_GET_CREDS
                 if ( ( tmp_gssapi_creds = ssh_gssapi_get_creds( con.session ) ) != NULL ) {
                     /* client forwarded a token */
                     display( LOG_INFO, "Client forwarded a token" );
                 }
+#endif
                 break;
                         
               default:

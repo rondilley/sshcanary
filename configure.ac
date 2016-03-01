@@ -209,6 +209,7 @@ AC_CHECK_FUNCS([alarm])
 AC_CHECK_FUNCS([endgrent])
 AC_CHECK_FUNCS([strerror])
 AC_CHECK_FUNCS([strtol])
+AC_CHECK_FUNCS([ssh_gssapi_get_creds])
 AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_LSTAT
 AC_FUNC_MEMCMP
