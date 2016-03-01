@@ -95,7 +95,7 @@ int startSshCanary( void ) {
     
 #ifdef DEBUG
     if ( config->debug >= 1 )
-      display( LOG_INFO, "Listening on port %d", config->tcpPort );
+      display( LOG_DEBUG, "Listening on port %d", config->tcpPort );
 #endif
     
     /* Loop forever, waiting for and handling connection attempts. */
@@ -107,9 +107,19 @@ int startSshCanary( void ) {
 
 #ifdef DEBUG
         if (config->debug >= 2 )
-            display( LOG_INFO, "Accepted a connection" );
+            display( LOG_DEBUG, "Accepted a connection" );
 #endif
         
+        /* update random for trap before fork */
+        if ( config->trap )
+            config->random = ( rand() % config->trap );
+        
+#ifdef DEBUG
+        if ( config->debug >= 7 )
+            display( LOG_DEBUG, "Random: %d", config->random );
+#endif
+        
+        /* XXX need to use IPC to get telemetry back to the parent or handle concurrent connections with threads */
         switch (fork())  {
             case -1:
                 display( LOG_ERR, "Forker broken" );
@@ -206,12 +216,12 @@ static int *get_client_ip(struct connection *c) {
 static int log_attempt(struct connection *c, int message_type ) {
     FILE *f;
     int r;
-    ssh_key tmp_ssh_key;
+    ssh_key *tmp_ssh_key = NULL;
     unsigned char *tmp_hash = NULL;
     size_t tmp_hlen;
     char tmp_buf[SHA1_HASH_STR_LEN];
     
-    /* XXX only open the file once */
+    /* XXX should only open the file once */
     if ((f = fopen(config->log_file, "a+")) == NULL) {
         display( LOG_ERR, "Unable to open %s", config->log_file );
         return -1;
@@ -227,19 +237,19 @@ static int log_attempt(struct connection *c, int message_type ) {
         return -1;
     }
 
-    c->user = ssh_message_auth_user(c->message);
+    c->user = ssh_message_auth_user( c->message );
     if ( message_type EQ SSH_AUTH_METHOD_PASSWORD ) {
-        c->pass = ssh_message_auth_password(c->message);
-        if ( config->trap ) {
-            //if ( ( rand() % 10 ) EQ 1 ) {
-            display( LOG_DEBUG, "Trap: %d", rand() % 10 );
+        c->pass = ssh_message_auth_password( c->message );
+        if ( config->trap && ( config->random EQ 0 ) ) {
 #ifdef DEBUG
-                if ( config->debug > 6 )
-                    display( LOG_DEBUG, "Trap set" );
+            if ( config->debug > 6 )
+                display( LOG_DEBUG, "Trap set" );
 #endif
-                r = fprintf( f, "date=%s ip=%s user=%s pw=%s trap\n", c->con_time, c->client_ip, c->user, c->pass );
-                ssh_message_auth_reply_success( c->message, 0 );
-            //}
+            r = fprintf( f, "date=%s ip=%s user=%s pw=%s trap\n", c->con_time, c->client_ip, c->user, c->pass );
+            ssh_message_auth_reply_success( c->message, 0 );
+            /* cleanup message */
+            ssh_message_free( c->message );
+            c->message = NULL;
         } else
             r = fprintf( f, "date=%s ip=%s user=%s pw=%s\n", c->con_time, c->client_ip, c->user, c->pass );
             
@@ -254,7 +264,10 @@ static int log_attempt(struct connection *c, int message_type ) {
             display( LOG_ERR, "Unable to generate hash of public key" );
         else {
             r = fprintf( f, "date=%s ip=%s user=%s keytype=%s key=sha1:%s\n", c->con_time, c->client_ip, c->user, ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ), hash2hex( tmp_hash, tmp_buf, tmp_hlen ) );
+            if ( tmp_hash != NULL )
+                XFREE( tmp_hash );
         }
+        ssh_key_free( tmp_ssh_key );
     }
     return r;
 }
@@ -334,6 +347,7 @@ int handle_auth(ssh_session session) {
               
           case SSH_REQUEST_SERVICE:
               display( LOG_INFO, "Client sent service message" );
+              /* XXX need to process the service messages */
               break;
               
           case SSH_REQUEST_GLOBAL:
@@ -346,9 +360,10 @@ int handle_auth(ssh_session session) {
         }
         
         /* Send the default message regardless of the request type. */
-        
-        ssh_message_reply_default( con.message );
-        ssh_message_free( con.message );
+        if ( con.message != NULL ) {
+            ssh_message_reply_default( con.message );
+            ssh_message_free( con.message );
+        }
     }
 
 #ifdef DEBUG

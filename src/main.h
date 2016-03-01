@@ -46,6 +46,7 @@
 #define SYSLOG_SOCKET "/dev/log"
 #define MAX_FILE_DESC 256
 #define MAXADDRLEN 16
+#define TRAP_DEFAULT_PROB 1000
 
 /* user and group defaults */
 #define MAX_USER_LEN 16

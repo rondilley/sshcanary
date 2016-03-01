@@ -109,6 +109,7 @@ typedef struct {
   int facility;
   int priority;
   int tcpPort;
+  int random;
   time_t current_time;
   pid_t cur_pid;
 } Config_t;

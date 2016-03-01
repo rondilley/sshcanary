@@ -69,7 +69,6 @@ int main(int argc, char *argv[]) {
   PRIVATE struct passwd *pwd_ent;
   PRIVATE struct group *grp_ent;
   PRIVATE char **ptr;
-  char *tmp_ptr = NULL;
   char *pid_file = NULL;
   char *user = NULL;
   char *group = NULL;
@@ -101,16 +100,11 @@ int main(int argc, char *argv[]) {
     endpwent();
     exit( EXIT_FAILURE );
   }
-  if ( ( tmp_ptr = strdup( pwd_ent->pw_dir ) ) EQ NULL ) {
+  if ( ( config->home_dir = strdup( pwd_ent->pw_dir ) ) EQ NULL ) {
     fprintf( stderr, "Unable to dup home dir\n" );
     endpwent();
     exit( EXIT_FAILURE );
   }
-  
-  /* set home dir */
-  config->home_dir = ( char * )XMALLOC( MAXPATHLEN + 1 );
-  XMEMSET( config->home_dir, 0, MAXPATHLEN + 1 );
-  XSTRNCPY( config->home_dir, pwd_ent->pw_dir, MAXPATHLEN );
   endpwent();
 
   /* get real uid and gid in prep for priv drop */
@@ -131,15 +125,15 @@ int main(int argc, char *argv[]) {
       {"listen", required_argument, 0, 'L' },
       {"pid", required_argument, 0, 'P' },
       {"port", required_argument, 0, 'p' },
-      {"trap", no_argument, 0, 't' },
+      {"trap", required_argument, 0, 't' },
       {"user", required_argument, 0, 'u' },
       {"group", required_argument, 0, 'g' },
       {"version", no_argument, 0, 'v' },
       {0, no_argument, 0, 0}
     };
-    c = getopt_long(argc, argv, "c:d:Dhk:l:L:P:p:tu:g:v", long_options, &option_index);
+    c = getopt_long(argc, argv, "c:d:Dhk:l:L:P:p:t:u:g:v", long_options, &option_index);
 #else
-    c = getopt( argc, argv, "c:d:Dhk:l:L:P:p:tu:g:v" );
+    c = getopt( argc, argv, "c:d:Dhk:l:L:P:p:t:u:g:v" );
 #endif
 
     if (c EQ -1)
@@ -211,7 +205,9 @@ int main(int argc, char *argv[]) {
       
     case 't':
       /* enable traps (random auth success messages) */
-      config->trap = TRUE;
+      config->trap = atoi( optarg );
+      if ( config->trap <= 0 )
+        config->trap = TRAP_DEFAULT_PROB;
         
       break;
         
@@ -290,7 +286,7 @@ int main(int argc, char *argv[]) {
 #ifdef DEBUG
   if ( config->debug >= 4 ) {
     fprintf( stderr, "PID: %s\n", pid_file );
-    fprintf( stderr, "LDIR: %s\n", config->log_dir );
+    fprintf( stderr, "LDIR: %s\n", config->log_file );
   }
 #endif
 
