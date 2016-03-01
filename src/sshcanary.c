@@ -216,9 +216,9 @@ static int *get_client_ip(struct connection *c) {
 static int log_attempt(struct connection *c, int message_type ) {
     FILE *f;
     int r;
-    ssh_key *tmp_ssh_key = NULL;
+    ssh_key tmp_ssh_key;
     unsigned char *tmp_hash = NULL;
-    size_t tmp_hlen;
+    size_t *tmp_hlen;
     char tmp_buf[SHA1_HASH_STR_LEN];
     
     /* XXX should only open the file once */
@@ -260,14 +260,15 @@ static int log_attempt(struct connection *c, int message_type ) {
             display( LOG_DEBUG, "Client presented a %s key", ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ) );
 #endif
             
-        if ( ssh_get_publickey_hash( tmp_ssh_key, SSH_PUBLICKEY_HASH_SHA1, &tmp_hash, &tmp_hlen ) < 0 )
+        if ( ssh_get_publickey_hash( tmp_ssh_key, SSH_PUBLICKEY_HASH_SHA1, &tmp_hash, tmp_hlen ) < 0 )
             display( LOG_ERR, "Unable to generate hash of public key" );
         else {
-            r = fprintf( f, "date=%s ip=%s user=%s keytype=%s key=sha1:%s\n", c->con_time, c->client_ip, c->user, ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ), hash2hex( tmp_hash, tmp_buf, tmp_hlen ) );
+            r = fprintf( f, "date=%s ip=%s user=%s keytype=%s key=sha1:%s\n", c->con_time, c->client_ip, c->user, ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ), hash2hex( tmp_hash, tmp_buf, *tmp_hlen ) );
             if ( tmp_hash != NULL )
                 XFREE( tmp_hash );
+            if ( tmp_hlen != NULL )
+                XFREE( tmp_hlen );
         }
-        ssh_key_free( tmp_ssh_key );
     }
     return r;
 }
