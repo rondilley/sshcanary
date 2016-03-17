@@ -7,7 +7,16 @@ http://www.uberadmin.com/Projects/sshcanary/
 
 == What is sshcanaryd?
 
+SSH Canary is a ver low interaction honeypot specifically designed to gather
+information about potential attackers that attemp to brute-force into a
+system using SSH.
+
 == Why use it?
+
+If you are tired of the constant SSH brute-force noise from your IDS and installing fail2ban is just too simple for you, you can use SSH Canary to monitor
+attackers and better understand the attributes of their campaigns against your
+systems.  It is also nice to know if their dictionaries inculde some of your
+passwords at the same time.
 
 == Implimentation
 
@@ -41,5 +50,4 @@ it.
 
 Ron Dilley
 ron.dilley@uberadmin.com
-
 

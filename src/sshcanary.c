@@ -120,6 +120,9 @@ int startSshCanary( void ) {
 #endif
         
         /* XXX need to use IPC to get telemetry back to the parent or handle concurrent connections with threads */
+        
+        /* XXX if we stop blocking and open a pipe, the children can talk back to the parent */
+        
         switch (fork())  {
             case -1:
                 display( LOG_ERR, "Forker broken" );
