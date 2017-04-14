@@ -1,85 +1,111 @@
-.TH DT 1  "28 February 2016" "sshcanaryd @VERSION@" "sshcanaryd @VERSION@"
+.TH SSHCANARY 1  "11 April 2017" "sshcanaryd @VERSION@" "sshcanaryd @VERSION@"
 .SH NAME
-dt \- SSH Canary.
+sshcanary \- SSH Canary.
 .SH SYNOPSIS
 .na
 .B sshcanaryd
 [
-.B \-ahmpqsv
+.B \-Dhv
+] [
+.B \-c
+.I dir
 ] [
 .B \-d
 .I log\-level
 ] [
-.B \-e
-.I dir
+.B \-k
+.I fname
 ] [
-.B \-E
-.I file
+.B \-l
+.I fname
 ] [
-.B \-w
-.I file
+.B \-L
+.I addr
+] [
+.B \-p
+.I port
+] [
+.B \-P
+.I fname
+] [
+.B \-t
+.I freqency
+] [
+.B \-u
+.I user
+] [
+.B \-g
+.I group
+] [
 ]
 .SH DESCRIPTION
 .LP
-.B \fldt\fP is a simple command line utility to quickly identify changes to two or more directory trees.
+.B \flsshcanary\fP is a very low interaction honeypot that mimics an SSH server for the purpose of recording telemetry about SSH attacks.
+.SH OPTIONS
 .TP
-.B \-a
-show last access time changes (enables -p|--preserve)
+.B \-c|--chroot \fl{dir}\fP
+Run sshcanary in \fl{dir}\fP chroot environment.
 .TP
-.B \-d
+.B \-d|--debug
 Enable debug mode, the higher the \fllog\-level\fP, the more verbose the logging.
 .TP
-.B \-e
-exclude {dir} and it's subdirectories
+.B \-D|--daemon
+Run sshcanary as a daemon.
 .TP
-.B \-E
-exclude all the directories listed in {file}
-.TP
-.B \-h
+.B \-h|--help
 Display help details.
 .TP
-.B \-m
-MD5 hash files and compare (disables -q|--quick and -s|--sha256 modes)
+.B \-k|--key \fl{filename}\fP
+Load ssh server key from \fl{filename}\fP.
 .TP
-.B \-p
-preserve ATIME when hashing files (must have appropriate privileges)
+.B \-l|--log \fl{filename}\fP
+Write sshcanary events to \fl{filename}\fP.
 .TP
-.B \-q
-Enable quick mode.
+.B \-L|--listen \fl{ipaddress}\fP
+Make sshcanary listen for connections on \fl{ipaddress}\fP.
 .TP
-.B \-s
-SHA256 hash files and compare (disables -q|--quick and -m|--md5 modes)
+.B \-p|--port \fl{tcpport}\fP
+Make sshcanary listen for ssh connectons on \fl{tcpport}\fP.
+.TP
+.B \-P|--pid \fl{filename}\fP
+Write sshcanary PID to \fl{filename}\fP.
+.TP
+.B \-t|--trap \fl{frequency}\fP
+Randomly claim that authentication was successful once every \fl{frequency}\fP connections.
+.TP
+.B \-u|--user \fl{user}\fP
+Run sshcanary as \fl{user}\fP.
+.TP
+.B \-g|--group \fl{group}\fP
+Run sshcanary as \fl{group}\fP.
 .TP
 .B \-v
 Show version information.
-.TP
-.B \-w
-write directory tree to {file}
+
+.SH INSTALL 
+
+You must first generate a server key for sshcanary to present when clients connect.
+
+% ssh-keygen -t rsa -f server.key
+
+# /sbin/iptables -A PREROUTING -t nat -p tcp --dport 22 -j REDIRECT --to-port 2222
 
 .SH EXAMPLES
-You can use difftree to compare two or more directory trees or you can save how a directory tree looks and compare the current state of the directory tree to a previous saved file.
 
-dt -m -w cvs_dir.txt ~/cvs
+.SH FILES
+/var/run/sshcanary.pid
 
-This command will process the ~/cvs directory tree and store the metadata in cvs_dir.txt.  That file can now be compared with other difftree files or directories.
-
-dt -m cvs_dir.txt ~/cvs
-
-You can compare more than two files and directories at the same time.  They will be compared left to right.
-
-dt -m cvs_dir.txt ~/cvs1 ~/cvs2 ~/cvs3 ~/cvs4
-
-.SH DIAGNOSTICS
-\fldt\fP returns 0 on normal program termination and 1 on error.  Additional diagnostic information is available through the \-d command line switch.
+.SH EXIT STATUS
+\flsshcanary\fP returns 0 on normal program termination and 1 on error.  Additional diagnostic information is available through the \-d command line switch.
 
 .SH SIGNALS
 .TP
-.B \flSIGHUP\fP will cause \fldt\fP to close the current logfile, then start a new logfile.
+.B \flSIGHUP\fP will cause \flsshcanary\fP to close the current logfile, then start a new logfile.
 .TP
-.B \flSIGTERM\fP will cause \fldt\fP to shutdown.
+.B \flSIGTERM\fP will cause \flsshcanary\fP to shutdown.
 
 .SH COPYRIGHT
-dt is Copyright (c) 2011-2015 Ron Dilley.
+sshcanary is Copyright (c) 2011-2017 Ron Dilley.
 
 This program is free software; you can redistribute it and/or modify 
 it under the terms of the GNU General Public License as published 
@@ -98,10 +124,10 @@ MA 02111-1307 USA.
 
 .SH BUGS
 Please send problems, bugs, questions, desirable enhancements, etc. to:
-dt-workers@uberadmin.com
+sshcanary-workers@uberadmin.com
 
 Please send source code contributions, etc. to:
-dt-patches@uberadmin.com
+sshcanary-patches@uberadmin.com
 
 There are no documented bugs at this time.
 .SH AUTHORS

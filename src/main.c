@@ -552,23 +552,36 @@ PRIVATE void print_help( void ) {
   print_version();
 
   fprintf( stderr, "\n" );
-  fprintf( stderr, "syntax: %s [options] {dir}|{file} [{dir} ...]\n", PACKAGE );
+  fprintf( stderr, "syntax: %s [options]\n", PACKAGE );
 
 #ifdef HAVE_GETOPT_LONG
-
-  fprintf( stderr, " -d|--debug (0-9)     enable debugging info\n" );
-
+  fprintf( stderr, " -c|--chroot {dir}    chroot to {dir}\n" );
+  fprintf( stderr, " -d|--debug {lvl}     enable debugging info (0-9)\n" );
+  fprintf( stderr, " -D|--daemon          run in the background\n" );
   fprintf( stderr, " -h|--help            this info\n" );
-
+  fprintf( stderr, " -k|--key {fname}     filename where ssh key is stored\n" );
+  fprintf( stderr, " -l|--log {fname}     filename where events will be logged\n" );
+  fprintf( stderr, " -L|--listen {addr}   address to listen on\n" );
+  fprintf( stderr, " -p|--port {portnum}  port to listen on (default:22)\n" );
+  fprintf( stderr, " -P|--pid {fname}     filename where pid is stored\n" );
+  fprintf( stderr, " -t|--trap {freq}     randomly report success (default:%i)\n", TRAP_DEFAULT_PROB );
+  fprintf( stderr, " -u|--user {uname}    user to run as\n" );
+  fprintf( stderr, " -g|--group {gname}   group to run as\n" );
   fprintf( stderr, " -v|--version         display version information\n" );
-
 #else
-  fprintf( stderr, " -d {lvl}   enable debugging info\n" );
-
-  fprintf( stderr, " -h         this info\n" );
-
-  fprintf( stderr, " -v         display version information\n" );
-
+  fprintf( stderr, " -c {dir}      chroot to {dir}\n" );
+  fprintf( stderr, " -d {lvl}      enable debugging info (0-9)\n" );
+  fprintf( stderr, " -D            run in the background\n" );
+  fprintf( stderr, " -h            this info\n" );
+  fprintf( stderr, " -k {fname}    filename where ssh key is stored\n" );
+  fprintf( stderr, " -l {fname}    filename where events will be logged\n" );
+  fprintf( stderr, " -L {addr}     address to listen on\n" );
+  fprintf( stderr, " -p {portnum}  port to listen on (default:22)\n" );
+  fprintf( stderr, " -P {fname}    filename where pid is stored\n" );
+  fprintf( stderr, " -t {freq}     randomly report success (default:%i)\n", TRAP_DEFAULT_PROB );
+  fprintf( stderr, " -u {uname}    user to run as\n" );
+  fprintf( stderr, " -g {gname}    group to run as\n" );
+  fprintf( stderr, " -v            display version information\n" );
 #endif
 
   fprintf( stderr, "\n" );
