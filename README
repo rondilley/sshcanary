@@ -95,7 +95,7 @@ I have built and tested this tool on the following operating systems:
 
 == Security Implications
 
-Assume that there are errors in the dt source that would
+Assume that there are errors in the source that would
 allow an attacker to gain unauthorized access to your
 computer.  Don't trust this software and install and use
 it at your own risk.
