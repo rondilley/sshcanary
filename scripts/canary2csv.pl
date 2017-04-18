@@ -102,14 +102,14 @@ sub main {
 # display banner info
 #
 sub show_banner {
-  print "$::PROGNAME v$::VERSION\n";
-  print "By: Ron Dilley\n";
-  print "\n";
-  print "$::PROGNAME comes with ABSOLUTELY NO WARRANTY.\n";
-  print "This is free software, and you are welcome\n";
-  print "to redistribute it under certain conditions;\n";
-  print "See the GNU General Public License for details.\n";
-  print "\n";
+  print stderr "$::PROGNAME v$::VERSION\n";
+  print stderr "By: Ron Dilley\n";
+  print stderr "\n";
+  print stderr "$::PROGNAME comes with ABSOLUTELY NO WARRANTY.\n";
+  print stderr "This is free software, and you are welcome\n";
+  print stderr "to redistribute it under certain conditions;\n";
+  print stderr "See the GNU General Public License for details.\n";
+  print stderr "\n";
 
   return $::TRUE;
 }
@@ -118,12 +118,12 @@ sub show_banner {
 # display help info
 #
 sub show_help {
-  print "Syntax:\n";
-  print "\n";
-  print "$::PROGNAME [options] {file} [{file} ...]\n";
-  print "\n";
-  print "-d {0-9}   Display debug information during program run\n";
-  print "\n";
+  print stderr "Syntax:\n";
+  print stderr "\n";
+  print stderr "$::PROGNAME [options] {file} [{file} ...]\n";
+  print stderr "\n";
+  print stderr "-d {0-9}   Display debug information during program run\n";
+  print stderr "\n";
 
   return $::TRUE;
 }
@@ -175,6 +175,8 @@ sub processFile {
     }
   }
 
+  print "date,ip,user,pw\n";
+  
   while ( $line = <$fHandle> ) {
     chomp( $line );
     # date=2016-02-29 06:41:15 ip=183.3.202.101 user=root pw=4r5t6y7u
