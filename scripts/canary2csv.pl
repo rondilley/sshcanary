@@ -187,19 +187,19 @@ sub processFile {
     
     if ( $line =~ m/^date\=(.*)\sip\=(.*)\suser\=(.*)\spw\=(.*)\strap$/ ) { # < v0.5 trapped
       $date = $1;
-      $date =~ tr/@/ /;
+      $date =~ tr/@/ /; # fixing v0.2 time format
       $ip = $2;
       $user = $3;
       $pw = $4;
     } elsif ( $line =~ m/^date\=(.*)\sip\=(.*)\suser\=(.*)\spw\=(.*)$/ ) { # < v0.5
       $date = $1;
-      $date =~ tr/@/ /;
+      $date =~ tr/@/ /; # fixing v0.2 time format
       $ip = $2;
       $user = $3;
       $pw = $4;
-    } elsif ( $line =~ m/^date\=(.*)\sip\=(.*)\suser\=(.*)\sPW\=(.*)$/ ) { # >= v0.5 trapped
+    } elsif ( $line =~ m/^date\=(.*)\sip\=(.*)\sUSER\=(.*)\sPW\=(.*)$/ ) { # >= v0.5 trapped
       $date = $1;
-      $date =~ tr/@/ /;
+      $date =~ tr/@/ /; # fixing v0.2 time format
       $ip = $2;
       $user = $3;
       $pw = $4;

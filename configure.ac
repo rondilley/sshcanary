@@ -237,6 +237,21 @@ AC_STRUCT_ST_BLOCKS
 AC_TYPE_OFF_T
 AC_TYPE_SIGNAL
 
+dnl Checks for pointer size
+AC_CHECK_SIZEOF(void*, 4)
+
+if test "x$ac_cv_sizeof_voidp" != "x"; then
+    if test "$ac_cv_sizeof_voidp" = "4"; then
+        AC_DEFINE([BUILD32BIT], [1], [32bit Build])
+    elif test "$ac_cv_sizeof_voidp" = "8"; then
+	AC_DEFINE([BUILD64BIT], [1], [64bit Build])
+    else
+	AC_ERROR([Cannot recognize size of void*])
+    fi
+else
+    AC_ERROR([Cannot determine size of void*])
+fi
+
 AM_CONFIG_HEADER(include/config.h)
 AC_PROG_INSTALL
 AC_OUTPUT(Makefile src/Makefile sshcanaryd.1)

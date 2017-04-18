@@ -35,6 +35,7 @@
 #define SHA1_HASH_LEN 20
 #define MD5_HASH_STR_LEN 33
 #define SHA1_HASH_STR_LEN 41
+#define MAX_TRY_COUNT 2
 
 /****
  *

@@ -182,12 +182,12 @@ static void wrapup(void) {
  *
  ****/
 
-/* XXX needs to be adjusted to use config->current_time to resude time calls */
+/* XXX needs to be adjusted to use config->current_time to reduce time calls */
 
 static int get_utc(struct connection *c) {
     time_t t;
     t = time(NULL);
-    return strftime(c->con_time, MAXBUF, "%Y-%m-%d@%H:%M:%S", gmtime(&t));
+    return strftime(c->con_time, MAXBUF, "%Y-%m-%d %H:%M:%S", gmtime(&t));
 }
 
 /****
@@ -196,7 +196,7 @@ static int get_utc(struct connection *c) {
  *
  ****/
 
-/* XXX need to gather other itel from libssh including keys, etc */
+/* XXX need to gather other intel from libssh including keys, etc */
 
 static int *get_client_ip(struct connection *c) {
     struct sockaddr_storage tmp;
@@ -217,26 +217,27 @@ static int *get_client_ip(struct connection *c) {
  ****/
 
 static int log_attempt(struct connection *c, int message_type ) {
-    FILE *f;
+    FILE *f = NULL;
     int r;
     ssh_key tmp_ssh_key;
-    unsigned char *tmp_hash = NULL;
-    size_t *tmp_hlen;
+    unsigned char *tmp_hash_p = NULL;
+    size_t tmp_hlen;
     char tmp_buf[SHA1_HASH_STR_LEN];
-    
-    /* XXX should only open the file once */
-    if ((f = fopen(config->log_file, "a+")) == NULL) {
+       
+    if (( f = fopen(config->log_file, "a+")) == NULL) {
         display( LOG_ERR, "Unable to open %s", config->log_file );
         return -1;
     }
 
     if (get_utc(c) <= 0) {
         display( LOG_ERR, "Error getting time");
+        fclose( f );
         return -1;
     }
 
     if (get_client_ip(c) < 0) {
         display( LOG_ERR, "Error getting client ip");
+        fclose( f );
         return -1;
     }
 
@@ -248,7 +249,7 @@ static int log_attempt(struct connection *c, int message_type ) {
             if ( config->debug > 6 )
                 display( LOG_DEBUG, "Trap set" );
 #endif
-            r = fprintf( f, "date=%s ip=%s user=%s pw=%s trap\n", c->con_time, c->client_ip, c->user, c->pass );
+            r = fprintf( f, "date=%s ip=%s USER=%s PW=%s\n", c->con_time, c->client_ip, c->user, c->pass );
             ssh_message_auth_reply_success( c->message, 0 );
             /* cleanup message */
             ssh_message_free( c->message );
@@ -263,16 +264,16 @@ static int log_attempt(struct connection *c, int message_type ) {
             display( LOG_DEBUG, "Client presented a %s key", ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ) );
 #endif
             
-        if ( ssh_get_publickey_hash( tmp_ssh_key, SSH_PUBLICKEY_HASH_SHA1, &tmp_hash, tmp_hlen ) < 0 )
+        if ( ssh_get_publickey_hash( tmp_ssh_key, SSH_PUBLICKEY_HASH_SHA1, &tmp_hash_p, &tmp_hlen ) < 0 )
             display( LOG_ERR, "Unable to generate hash of public key" );
         else {
-            r = fprintf( f, "date=%s ip=%s user=%s keytype=%s key=sha1:%s\n", c->con_time, c->client_ip, c->user, ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ), hash2hex( tmp_hash, tmp_buf, *tmp_hlen ) );
-            if ( tmp_hash != NULL )
-                XFREE( tmp_hash );
-            if ( tmp_hlen != NULL )
-                XFREE( tmp_hlen );
+            r = fprintf( f, "date=%s ip=%s user=%s keytype=%s key=sha1:%s\n", c->con_time, c->client_ip, c->user, ssh_key_type_to_char( ssh_key_type( tmp_ssh_key ) ), ssh_get_hexa( tmp_hash_p, tmp_hlen ) );
+            if ( tmp_hash_p != NULL )
+                ssh_clean_pubkey_hash( &tmp_hash_p );
         }
     }
+    
+    fclose( f );
     return r;
 }
 
@@ -282,6 +283,7 @@ int handle_auth(ssh_session session) {
     struct connection con;
     con.session = session;
     ssh_gssapi_creds tmp_gssapi_creds;
+    int try_count = 0;
     
     /* Perform key exchange. */
     if (ssh_handle_key_exchange(con.session)) {
@@ -317,7 +319,17 @@ int handle_auth(ssh_session session) {
             switch( ssh_message_subtype( con.message ) ) {
               case SSH_AUTH_METHOD_PASSWORD:
               case SSH_AUTH_METHOD_PUBLICKEY:
+                try_count++;
+                if ( try_count > MAX_TRY_COUNT ) {
+                    /* hang up, too many tries */
+                    ssh_silent_disconnect( session );
+                    /* cleanup message */
+                    ssh_message_free( con.message );
+                    con.message = NULL;
+                }
                 log_attempt( &con, ssh_message_subtype( con.message ) );
+
+                
                 break;
                         
               case SSH_AUTH_METHOD_NONE:
@@ -378,6 +390,19 @@ int handle_auth(ssh_session session) {
 #endif
     
     return 0;
+    
+    // LIBSSH_API const char *ssh_message_channel_request_pty_term(ssh_message msg);
+    // LIBSSH_API int ssh_message_channel_request_pty_width(ssh_message msg);
+    // LIBSSH_API int ssh_message_channel_request_pty_height(ssh_message msg);
+    // LIBSSH_API int ssh_message_channel_request_pty_pxwidth(ssh_message msg);
+    // LIBSSH_API int ssh_message_channel_request_pty_pxheight(ssh_message msg);
+    // LIBSSH_API const char *ssh_message_channel_request_env_name(ssh_message msg);
+    // LIBSSH_API const char *ssh_message_channel_request_env_value(ssh_message msg);
+    // LIBSSH_API const char *ssh_message_channel_request_command(ssh_message msg);
+    // LIBSSH_API const char *ssh_message_channel_request_subsystem(ssh_message msg);
+    // LIBSSH_API int ssh_message_channel_request_x11_single_connection(ssh_message msg);
+    // LIBSSH_API const char *ssh_message_channel_request_x11_auth_protocol(ssh_message msg);
+    // LIBSSH_API const char *ssh_message_channel_request_x11_auth_cookie(ssh_message msg);
 }
 
 /****

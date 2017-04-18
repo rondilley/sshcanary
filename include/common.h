@@ -97,6 +97,7 @@ typedef struct {
   char *home_dir;
   char *chroot_dir;
   char *log_file;
+  FILE *out_fh;
   char *key_file;
   char *outfile;
   char *hostname;

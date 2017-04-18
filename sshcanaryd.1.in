@@ -102,9 +102,22 @@ If you want to allow local connections to a real ssh server from your trusted ne
 
 .SH EXAMPLES
 
+A simple and dangerous way to run sshcanary is on the default ssh port as root.
+
+# sshcanaryd -l /var/sshcanary/server.log -k /var/sshcanary/server.key
+
+A better way to run sshcanary is to set an effective UID/GID using the -u|--user and -g|--group options as shown below.
+
+# sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key
+
+The installation includes an RC script for Linux that starts sshcanary in the above fashion but also enables random "traps" where sshcanary acts like the authentication was successful as seen below.
+
+# sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key -t 1000
+
+Logging is done in two places, system related events are logged to syslog and authentication events are logged to the specific log file.
 
 .SH FILES
-/var/run/sshcanary.pid
+/var/run/sshcanaryd.pid
 
 .SH EXIT STATUS
 .B \flsshcanary\fP returns 0 on normal program termination and 1 on error.  Additional diagnostic information is available through the \-d command line switch.

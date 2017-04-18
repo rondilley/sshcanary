@@ -2,3 +2,8 @@
 
 	* Initial public release.
 
+2017-04-17  Ron Dilley <ron.dilley@uberadmin.com>
+
+	* Enhanced the man pages and readme files
+	* Added a log post-processing script
+	* Added a RC script for Linux

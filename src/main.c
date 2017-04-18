@@ -353,7 +353,11 @@ int main(int argc, char *argv[]) {
       umask( 0027 );
 
       /* stir randoms if used */
-      srand((unsigned int)**main + (unsigned int)&argc + (unsigned int)time(NULL));
+#ifdef BUILD32BIT
+      srand((uint32_t)**main + (uint32_t)&argc + (uint32_t)time(NULL));
+#else // 64bit
+      srand((uint64_t)**main + (uint64_t)&argc + (uint64_t)time(NULL));
+#endif      
       srand(rand());
       
       /* done forking off */
@@ -598,8 +602,10 @@ PRIVATE void cleanup( void ) {
   XFREE( config->hostname );
   if ( config->home_dir != NULL )
     XFREE( config->home_dir );
+
   if ( config->outfile != NULL )
     XFREE( config->outfile );
+
   XFREE( config );
 #ifdef MEM_DEBUG
   XFREE_ALL();
