@@ -75,6 +75,8 @@ extern char **environ;
  ****/
 
 int startSshCanary( void ) {
+    int s;
+    
     /* Install the signal handlers to cleanup after children and at exit. */
     signal(SIGCHLD, (void (*)())listener_cleanup);
     signal(SIGINT, (void(*)())wrapup);
@@ -93,6 +95,10 @@ int startSshCanary( void ) {
         return( EXIT_FAILURE );
     }
     
+    /* disable bind blocking */
+    /* XXX does not appear to stop blocking on ssh_bind_accept, need to switch to FD and select */
+    ssh_bind_set_blocking(sshbind,0);
+    
 #ifdef DEBUG
     if ( config->debug >= 1 )
       display( LOG_DEBUG, "Listening on port %d", config->tcpPort );
@@ -100,39 +106,45 @@ int startSshCanary( void ) {
     
     /* Loop forever, waiting for and handling connection attempts. */
     while (1) {
-        if (ssh_bind_accept(sshbind, session) EQ SSH_ERROR) {
+        /* XXX need to switch to FD and select to loop and listen for child messages */
+        if ( ( s = ssh_bind_accept(sshbind, session) ) EQ SSH_ERROR) {
             display( LOG_ERR, "Error accepting a connection: [%s]", ssh_get_error( sshbind ) );
             return( EXIT_FAILURE );
-        }
+        } else if ( s EQ SSH_OK ) {
 
 #ifdef DEBUG
-        if (config->debug >= 2 )
-            display( LOG_DEBUG, "Accepted a connection" );
+            if (config->debug >= 2 )
+                display( LOG_DEBUG, "Accepted a connection" );
 #endif
         
-        /* update random for trap before fork */
-        if ( config->trap )
-            config->random = ( rand() % config->trap );
+            /* update random for trap before fork */
+            if ( config->trap )
+                config->random = ( rand() % config->trap );
         
 #ifdef DEBUG
-        if ( config->debug >= 7 )
-            display( LOG_DEBUG, "Random: %d", config->random );
+            if ( config->debug >= 7 )
+                display( LOG_DEBUG, "Random: %d", config->random );
 #endif
         
-        /* XXX need to use IPC to get telemetry back to the parent or handle concurrent connections with threads */
+            /* XXX need to use IPC to get telemetry back to the parent or handle concurrent connections with threads */
         
-        /* XXX if we stop blocking and open a pipe, the children can talk back to the parent */
+            /* XXX if we stop blocking and open a pipe, the children can talk back to the parent */
         
-        switch (fork())  {
-            case -1:
-                display( LOG_ERR, "Forker broken" );
-                exit(-1);
+            switch (fork())  {
+                case -1:
+                    display( LOG_ERR, "Forker broken" );
+                    exit(-1);
 
-            case 0:
-                exit(handle_auth(session));
+                case 0:
+                    exit(handle_auth(session));
 
-            default:
-                break;
+                default:
+                    break;
+            }
+        } else {
+            // did not accept a new connection
+            sleep( 1 );
+            display( LOG_DEBUG, "Sleep" );
         }
     }
 
@@ -241,8 +253,10 @@ static int log_attempt(struct connection *c, int message_type ) {
         return -1;
     }
 
+    /* XXX need to alloc for c->user and copy the message instead */
     c->user = ssh_message_auth_user( c->message );
     if ( message_type EQ SSH_AUTH_METHOD_PASSWORD ) {
+        /* XXX need to alloc for c->pass and copy the message instead */
         c->pass = ssh_message_auth_password( c->message );
         if ( config->trap && ( config->random EQ 0 ) ) {
 #ifdef DEBUG
