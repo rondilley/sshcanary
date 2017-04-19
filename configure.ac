@@ -144,6 +144,62 @@ case "$host" in
         ;;
 esac
 
+dnl libssh
+
+AC_ARG_WITH(libssh,
+[  --with-libssh=PATH      Specify path to libssh library.],
+    [
+        AC_MSG_CHECKING(for --with-libssh option)
+        case "$withval" in
+          yes|no)
+            AC_MSG_ERROR(PATH required with libssh option)
+            ;;
+          *)
+            if test '!' -d "$withval"; then
+                AC_MSG_ERROR($withval does not exist!)
+            else
+                AC_MSG_RESULT($withval)
+                if test -d "$withval/include/libssh"; then
+                  CFLAGS="-I$withval/include -I$withval/include/libssh ${CFLAGS}"
+                  CPPFLAGS="-I$withval/include -I$withval/include/libssh ${CPPFLAGS}"
+                else
+                  CFLAGS="-I$withval ${CFLAGS}"
+                  CPPFLAGS="-I$withval ${CPPFLAGS}"
+                fi
+                if test -d "$withval/lib"; then
+                  LDFLAGS="-L$withval/lib ${LDFLAGS}"
+                else
+                  LDFLAGS="-L$withval ${LDFLAGS}"
+                fi
+            fi
+            ;;
+          esac
+    ]
+)
+
+dnl Checks for libraries
+
+AC_CHECK_HEADERS([libssh/libssh.h],,LIBSSH="no")
+if test "$LIBSSH" = "no"; then
+   echo ""
+   echo "Error: Can't find libssh.h for libssh. Visit http://www.libssh.org for the latest version."
+   exit;
+fi
+
+AC_CHECK_HEADER([libssh/server.h],,LIBSSH="no")
+if test "$LIBSSH" = "no"; then
+    echo ""
+    echo "Error: Can't find server.h for libssh. Visit http://www.libssh.org for the latest version."
+    exit;
+fi
+
+AC_CHECK_LIB([ssh],ssh_new,LIBSSH="yes",LIBSSH="no")
+if test "$LIBSSH" = "no"; then
+    echo ""
+    echo "Error: Can't find ssh_new() from libssh. Visit http://www.libssh.org for the latest version."
+    exit;
+fi
+
 dnl ############## Header Checks
 
 AC_CHECK_HEADERS([arpa/inet.h])
@@ -176,8 +232,6 @@ AC_CHECK_HEADERS([ftw.h])
 AC_CHECK_HEADERS([pwd.h])
 AC_CHECK_HEADERS([signal.h])
 AC_CHECK_HEADERS([utime.h])
-AC_CHECK_HEADERS([libssh/libssh.h])
-AC_CHECK_HEADERS([libssh/server.h])
 AC_HEADER_DIRENT
 AC_HEADER_STDBOOL
 

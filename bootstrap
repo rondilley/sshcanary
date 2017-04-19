@@ -13,7 +13,7 @@ if [ ! -d config ]; then
 fi
 
 aclocal
-automake --gnu --add-missing
 autoheader
 autoconf
+automake --gnu --add-missing
 
