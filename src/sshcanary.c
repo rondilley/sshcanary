@@ -254,10 +254,10 @@ static int log_attempt(struct connection *c, int message_type ) {
     }
 
     /* XXX need to alloc for c->user and copy the message instead */
-    c->user = ssh_message_auth_user( c->message );
+    strncpy( c->user, ssh_message_auth_user( c->message ), MAXBUF );
     if ( message_type EQ SSH_AUTH_METHOD_PASSWORD ) {
         /* XXX need to alloc for c->pass and copy the message instead */
-        c->pass = ssh_message_auth_password( c->message );
+        strncpy( c->pass, ssh_message_auth_password( c->message ), MAXBUF );
         if ( config->trap && ( config->random EQ 0 ) ) {
 #ifdef DEBUG
             if ( config->debug > 6 )
@@ -337,9 +337,6 @@ int handle_auth(ssh_session session) {
                 if ( try_count > MAX_TRY_COUNT ) {
                     /* hang up, too many tries */
                     ssh_silent_disconnect( session );
-                    /* cleanup message */
-                    ssh_message_free( con.message );
-                    con.message = NULL;
                 }
                 log_attempt( &con, ssh_message_subtype( con.message ) );
 

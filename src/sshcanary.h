@@ -74,10 +74,10 @@
 struct connection {
     ssh_session session;
     ssh_message message;
-    char client_ip[MAXBUF];
-    char con_time[MAXBUF];
-    char *user;
-    char *pass;
+    char client_ip[MAXBUF+1];
+    char con_time[MAXBUF+1];
+    char user[MAXBUF+1];
+    char pass[MAXBUF+1];
 };
 
 /****
