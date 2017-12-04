@@ -118,6 +118,10 @@
 # include <getopt.h>
 #endif
 
+#ifdef HAVE_SYS_SOCKET_H
+# include <sys/socket.h>
+#endif
+
 #ifdef HAVE_SYS_BITYPES_H
 # include <sys/bitypes.h>
 #endif
@@ -136,6 +140,10 @@
 
 #ifdef HAVE_SYS_PARAM_H
 # include <sys/param.h>
+#endif
+
+#ifdef HAVE_SYS_WAIT_H
+# include <sys/wait.h>
 #endif
 
 #ifdef HAVE_SYS_RESOURCE_H
