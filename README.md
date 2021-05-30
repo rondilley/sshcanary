@@ -20,7 +20,7 @@ passwords at the same time.
 
 You must first generate a server key for sshcanary to present when clients connect.
 
-% ssh-keygen -t rsa -f server.key
+`% ssh-keygen -t rsa -f server.key`
 
 If you want to run sshcanary as a non-privileged user or in conjuntion with a real 
 ssh server, you can use iptables to forward connections to sshcanary on an alternate 
@@ -28,7 +28,7 @@ port.
 
 The following forwards all inbound ssh connections destined for TCP/22 to TCP/2222.
 
-# /sbin/iptables -A PREROUTING -t nat -p tcp --dport 22 -j REDIRECT --to-port 2222
+`# /sbin/iptables -A PREROUTING -t nat -p tcp --dport 22 -j REDIRECT --to-port 2222`
 
 When you start sshcanary, use -p 2222 or --port 2222 and all inbound ssh connections 
 will be forwarded to your sshcanary.
@@ -38,24 +38,25 @@ If you want to allow local connections to a real ssh server from your trusted ne
 sshcanary, you can use iptables to forward connections if they don't originate on 
 your trusted network.
 
-# /sbin/iptables -A PREROUTING -t nat -p tcp -s ! 192.168.10.0/24 --dport 22 -j REDIRECT --to-port 2222
+`# /sbin/iptables -A PREROUTING -t nat -p tcp -s ! 192.168.10.0/24 --dport 22 -j REDIRECT --to-port 2222`
 
 A simple and dangerous way to run sshcanary is on the default ssh port as root.
 
-# sshcanaryd -l /var/sshcanary/server.log -k /var/sshcanary/server.key
+`# sshcanaryd -l /var/sshcanary/server.log -k /var/sshcanary/server.key`
 
 A better way to run sshcanary is to set an effective UID/GID using the -u|--user and -g|--group options as shown below.
 
-# sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key
+`# sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key`
 
 The installation includes an RC script for Linux that starts sshcanary in the above fashion but also enables random "traps" where sshcanary acts like the authentication was successful as seen below.
 
-# sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key -t 1000
+`# sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key -t 1000`
 
 Logging is done in two places, system related events are logged to syslog and authentication events are logged to the specific log file as shown below.
 
 What sshcanary sends to syslog:
 
+```text
 Apr 17 12:29:57 server-dev sshcanaryd: sshcanaryd v0.6 [May  1 2021 - 20:57:47] started
 Apr 17 12:30:10 server-dev sshcanaryd: Client sent service message
 Apr 17 12:42:50 server-dev sshcanaryd: Client sent service message
@@ -63,9 +64,11 @@ Apr 17 12:42:50 server-dev sshcanaryd: Client tried to connect without authentic
 Apr 17 12:43:51 server-dev sshcanaryd: Client sent service message
 Apr 17 12:43:51 server-dev sshcanaryd: Client tried to connect without authenticating
 Apr 17 14:05:12 server-dev sshcanaryd: Error exchanging keys: []
+```
 
-What sshcanary writes to the log:
+What sshrgcanary writes to the log:
 
+```text
 date=2021-04-16@23:47:59 ip=91.197.232.103 user=support pw=support
 date=2021-04-16@23:48:02 ip=91.197.232.103 user=sysadmin pw=admin
 date=2021-04-16@23:48:04 ip=91.197.232.103 user=telecomadmin pw=nE7jA%5m
@@ -76,6 +79,7 @@ date=2021-04-16@23:48:16 ip=91.197.232.103 user=user pw=user
 date=2021-04-16@23:48:16 ip=91.197.232.103 user=user pw=123456
 date=2021-04-16@23:48:16 ip=91.197.232.103 user=user pw=1234
 date=2021-04-16@23:48:19 ip=91.197.232.103 user=user1 pw=1234
+```
 
 ## Compatibility
 
@@ -106,3 +110,4 @@ it.
 
 Ron Dilley
 ron.dilley@uberadmin.com
+
