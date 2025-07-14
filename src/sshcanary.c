@@ -2,7 +2,7 @@
  *
  * Description: SSH Canary Functions
  * 
- * Copyright (c) 2021, Ron Dilley
+ * Copyright (c) 2025, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -34,6 +34,9 @@
 
 #include "sshcanary.h"
 #include <libssh/server.h>
+#include <string.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 /****
  *
@@ -88,6 +91,18 @@ extern char **environ;
 
 /****
  *
+ * forward declarations
+ *
+ ****/
+
+static void listener_cleanup(int signo);
+static void wrapup(int signo);
+static int get_utc(struct connection *c);
+static int get_client_ip(struct connection *c);
+static int log_attempt(struct connection *c, int message_type);
+
+/****
+ *
  * functions
  *
  ****/
@@ -103,8 +118,8 @@ int startSshCanary(void)
     int s;
 
     /* Install the signal handlers to cleanup after children and at exit. */
-    signal(SIGCHLD, (void (*)())listener_cleanup);
-    signal(SIGINT, (void (*)())wrapup);
+    signal(SIGCHLD, listener_cleanup);
+    signal(SIGINT, wrapup);
 
     /* Create and configure the ssh session. */
     session = ssh_new();
@@ -192,7 +207,7 @@ int startSshCanary(void)
  * 
  ****/
 
-static int listener_cleanup(void)
+static void listener_cleanup(int signo)
 {
     int status;
     int pid;
@@ -207,9 +222,7 @@ static int listener_cleanup(void)
     }
 
     /* Re-install myself for the next child. */
-    signal(SIGCHLD, (void (*)())listener_cleanup);
-
-    return 0;
+    signal(SIGCHLD, listener_cleanup);
 }
 
 /****
@@ -218,7 +231,7 @@ static int listener_cleanup(void)
  * 
  ****/
 
-static void wrapup(void)
+static void wrapup(int signo)
 {
     ssh_disconnect(session);
     ssh_bind_free(sshbind);
@@ -249,7 +262,7 @@ static int get_utc(struct connection *c)
 
 /* XXX need to gather other intel from libssh including keys, etc */
 
-static int *get_client_ip(struct connection *c)
+static int get_client_ip(struct connection *c)
 {
     struct sockaddr_storage tmp;
     struct sockaddr_in *sock;
@@ -257,7 +270,11 @@ static int *get_client_ip(struct connection *c)
 
     getpeername(ssh_get_fd(c->session), (struct sockaddr *)&tmp, &len);
     sock = (struct sockaddr_in *)&tmp;
-    inet_ntop(AF_INET, &sock->sin_addr, c->client_ip, len);
+    if (inet_ntop(AF_INET, &sock->sin_addr, c->client_ip, MAXBUF) == NULL) {
+        /* fallback if inet_ntop fails */
+        strncpy(c->client_ip, "unknown", MAXBUF - 1);
+        c->client_ip[MAXBUF - 1] = '\0';
+    }
 
     return 0;
 }
@@ -275,7 +292,7 @@ static int log_attempt(struct connection *c, int message_type)
     ssh_key tmp_ssh_key;
     unsigned char *tmp_hash_p = NULL;
     size_t tmp_hlen;
-    char tmp_buf[SHA1_HASH_STR_LEN];
+    /* char tmp_buf[SHA1_HASH_STR_LEN]; */ /* unused */
 
     if ((f = fopen(config->log_file, "a+")) == NULL)
     {
@@ -290,19 +307,44 @@ static int log_attempt(struct connection *c, int message_type)
         return -1;
     }
 
-    if (get_client_ip(c) < 0)
+    if (get_client_ip(c) != 0)
     {
         display(LOG_ERR, "Error getting client ip");
         fclose(f);
         return -1;
     }
 
-    /* XXX need to alloc for c->user and copy the message instead */
-    strncpy(c->user, ssh_message_auth_user(c->message), MAXBUF);
+    /* safely copy user name with bounds checking */
+    const char *auth_user = ssh_message_auth_user(c->message);
+    if (auth_user != NULL) {
+        size_t user_len = strlen(auth_user);
+        if (user_len >= MAXBUF) {
+            /* truncate long usernames but keep them null-terminated */
+            strncpy(c->user, auth_user, MAXBUF - 1);
+            c->user[MAXBUF - 1] = '\0';
+        } else {
+            strcpy(c->user, auth_user);
+        }
+    } else {
+        strcpy(c->user, "<null>");
+    }
+    
     if (message_type EQ SSH_AUTH_METHOD_PASSWORD)
     {
-        /* XXX need to alloc for c->pass and copy the message instead */
-        strncpy(c->pass, ssh_message_auth_password(c->message), MAXBUF);
+        /* safely copy password with bounds checking */
+        const char *auth_pass = ssh_message_auth_password(c->message);
+        if (auth_pass != NULL) {
+            size_t pass_len = strlen(auth_pass);
+            if (pass_len >= MAXBUF) {
+                /* truncate long passwords but keep them null-terminated */
+                strncpy(c->pass, auth_pass, MAXBUF - 1);
+                c->pass[MAXBUF - 1] = '\0';
+            } else {
+                strcpy(c->pass, auth_pass);
+            }
+        } else {
+            strcpy(c->pass, "<null>");
+        }
         if (config->trap && (config->random EQ 0))
         {
 #ifdef DEBUG
@@ -341,12 +383,14 @@ static int log_attempt(struct connection *c, int message_type)
 }
 
 /* Logs password auth attempts. Always replies with SSH_MESSAGE_USERAUTH_FAILURE. */
-int handle_auth(ssh_session session)
+int handle_auth(ssh_session session_param)
 {
     struct connection con;
-    con.session = session;
-    ssh_gssapi_creds tmp_gssapi_creds;
+    con.session = session_param;
     int try_count = 0;
+#ifdef HAVE_SSH_GSSAPI_GET_CREDS
+    ssh_gssapi_creds tmp_gssapi_creds;
+#endif
 
     /* Perform key exchange. */
     if (ssh_handle_key_exchange(con.session))
@@ -391,7 +435,7 @@ int handle_auth(ssh_session session)
                 if (try_count > MAX_TRY_COUNT)
                 {
                     /* hang up, too many tries */
-                    ssh_silent_disconnect(session);
+                    ssh_silent_disconnect(session_param);
                 }
                 log_attempt(&con, ssh_message_subtype(con.message));
 
@@ -488,10 +532,10 @@ char *hash2hex(const unsigned char *hash, char *hashStr, int hLen)
     for (i = 0; i < hLen; i++)
     {
         snprintf(hByte, sizeof(hByte), "%02x", hash[i] & 0xff);
-#ifdef HAVE_STRNCAT
-        strncat(hashStr, hByte, hLen * 2);
+#ifdef HAVE_STRLCAT
+        strlcat(hashStr, hByte, hLen * 2 + 1);
 #else
-        strlcat(hashStr, hByte, hLen * 2);
+        strncat(hashStr, hByte, (hLen * 2) - strlen(hashStr) - 1);
 #endif
     }
 

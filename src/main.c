@@ -2,7 +2,7 @@
  *
  * Description: main Functions
  * 
- * Copyright (c) 2021, Ron Dilley
+ * Copyright (c) 2025, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,6 +28,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
+#include <signal.h>
 
 #include "main.h"
 
@@ -43,8 +48,8 @@
  *
  ****/
 
-PUBLIC int quit = FALSE;
-PUBLIC int reload = FALSE;
+PUBLIC volatile sig_atomic_t quit = FALSE;
+PUBLIC volatile sig_atomic_t reload = FALSE;
 PUBLIC Config_t *config = NULL;
 
 /****
@@ -64,11 +69,9 @@ extern char **environ;
 
 int main(int argc, char *argv[]) {
   PRIVATE int pid = 0;
-  PRIVATE int c = 0, i = 0, fds = 0, status = 0;
-  int digit_optind = 0;
+  PRIVATE int c = 0, i = 0, fds = 0;
   PRIVATE struct passwd *pwd_ent;
   PRIVATE struct group *grp_ent;
-  PRIVATE char **ptr;
   char *pid_file = NULL;
   char *user = NULL;
   char *group = NULL;
@@ -112,7 +115,7 @@ int main(int argc, char *argv[]) {
   config->uid = getuid();
 
   while (1) {
-    int this_option_optind = optind ? optind : 1;
+    /* int this_option_optind = optind ? optind : 1; */ /* unused */
 #ifdef HAVE_GETOPT_LONG
     int option_index = 0;
     static struct option long_options[] = {
@@ -143,16 +146,31 @@ int main(int argc, char *argv[]) {
 
     case 'c':
       /* chroot the process into the specific dir */
-      config->chroot_dir = ( char * )XMALLOC( MAXPATHLEN + 1 );
-      XMEMSET( config->chroot_dir, 0, MAXPATHLEN + 1 );
-      XSTRNCPY( config->chroot_dir, optarg, MAXPATHLEN );
+      if (strlen(optarg) >= PATH_MAX) {
+        fprintf(stderr, "ERROR: chroot path too long (max %d chars)\n", PATH_MAX-1);
+        cleanup();
+        exit(EXIT_FAILURE);
+      }
+      config->chroot_dir = ( char * )XMALLOC( PATH_MAX );
+      XMEMSET( config->chroot_dir, 0, PATH_MAX );
+      XSTRNCPY( config->chroot_dir, optarg, PATH_MAX - 1 );
+      config->chroot_dir[PATH_MAX - 1] = '\0';
 
       break;
 
     case 'd':
-      /* show debig info */
-      config->debug = atoi( optarg );
-      config->mode = MODE_INTERACTIVE;
+      /* show debug info */
+      {
+        char *endptr;
+        long debug_val = strtol(optarg, &endptr, 10);
+        if (*endptr != '\0' || debug_val < 0 || debug_val > 9) {
+          fprintf(stderr, "ERROR: debug level must be 0-9\n");
+          cleanup();
+          exit(EXIT_FAILURE);
+        }
+        config->debug = (int)debug_val;
+        config->mode = MODE_INTERACTIVE;
+      }
       break;
 
     case 'D':
@@ -167,56 +185,102 @@ int main(int argc, char *argv[]) {
 
     case 'k':
       /* define keyfile */
-      config->key_file = ( char * )XMALLOC( MAXPATHLEN + 1 );
-      XMEMSET( config->key_file, 0, MAXPATHLEN + 1 );
-      XSTRNCPY( config->key_file, optarg, MAXPATHLEN );
+      if (strlen(optarg) >= PATH_MAX) {
+        fprintf(stderr, "ERROR: key file path too long (max %d chars)\n", PATH_MAX-1);
+        cleanup();
+        exit(EXIT_FAILURE);
+      }
+      config->key_file = ( char * )XMALLOC( PATH_MAX );
+      XMEMSET( config->key_file, 0, PATH_MAX );
+      XSTRNCPY( config->key_file, optarg, PATH_MAX - 1 );
+      config->key_file[PATH_MAX - 1] = '\0';
 
       break;
       
     case 'l':
       /* define the dir to store logs in */
-      config->log_file = ( char * )XMALLOC( MAXPATHLEN + 1 );
-      XMEMSET( config->log_file, 0, MAXPATHLEN + 1 );
-      XSTRNCPY( config->log_file, optarg, MAXPATHLEN );
+      if (strlen(optarg) >= PATH_MAX) {
+        fprintf(stderr, "ERROR: log file path too long (max %d chars)\n", PATH_MAX-1);
+        cleanup();
+        exit(EXIT_FAILURE);
+      }
+      config->log_file = ( char * )XMALLOC( PATH_MAX );
+      XMEMSET( config->log_file, 0, PATH_MAX );
+      XSTRNCPY( config->log_file, optarg, PATH_MAX - 1 );
+      config->log_file[PATH_MAX - 1] = '\0';
 
       break;
 
     case 'L':
       /* set the listen address */
-      config->listen_addr = ( char * )XMALLOC( MAXADDRLEN + 1 );
-      XMEMSET( config->listen_addr, 0, MAXADDRLEN + 1 );
-      XSTRNCPY( config->listen_addr, optarg, MAXADDRLEN );
+      if (strlen(optarg) >= MAXADDRLEN) {
+        fprintf(stderr, "ERROR: listen address too long (max %d chars)\n", MAXADDRLEN-1);
+        cleanup();
+        exit(EXIT_FAILURE);
+      }
+      config->listen_addr = ( char * )XMALLOC( MAXADDRLEN );
+      XMEMSET( config->listen_addr, 0, MAXADDRLEN );
+      XSTRNCPY( config->listen_addr, optarg, MAXADDRLEN - 1 );
+      config->listen_addr[MAXADDRLEN - 1] = '\0';
 
       break;
       
     case 'P':
       /* define the location of the pid file used for rotating logs, etc */
-      pid_file = ( char * )XMALLOC( MAXPATHLEN + 1 );
-      XMEMSET( pid_file, 0, MAXPATHLEN + 1 );
-      XSTRNCPY( pid_file, optarg, MAXPATHLEN );
+      if (strlen(optarg) >= PATH_MAX) {
+        fprintf(stderr, "ERROR: pid file path too long (max %d chars)\n", PATH_MAX-1);
+        cleanup();
+        exit(EXIT_FAILURE);
+      }
+      pid_file = ( char * )XMALLOC( PATH_MAX );
+      XMEMSET( pid_file, 0, PATH_MAX );
+      XSTRNCPY( pid_file, optarg, PATH_MAX - 1 );
+      pid_file[PATH_MAX - 1] = '\0';
 
       break;
       
     case 'p':
       /* define tcp port */
-      config->tcpPort = atoi( optarg );
+      {
+        char *endptr;
+        long port_val = strtol(optarg, &endptr, 10);
+        if (*endptr != '\0' || port_val < 1 || port_val > 65535) {
+          fprintf(stderr, "ERROR: port must be 1-65535\n");
+          cleanup();
+          exit(EXIT_FAILURE);
+        }
+        config->tcpPort = (int)port_val;
+      }
 
       break;
       
     case 't':
       /* enable traps (random auth success messages) */
-      config->trap = atoi( optarg );
-      if ( config->trap <= 0 )
-        config->trap = TRAP_DEFAULT_PROB;
+      {
+        char *endptr;
+        long trap_val = strtol(optarg, &endptr, 10);
+        if (*endptr != '\0' || trap_val <= 0 || trap_val > 1000000) {
+          fprintf(stderr, "ERROR: trap frequency must be 1-1000000\n");
+          cleanup();
+          exit(EXIT_FAILURE);
+        }
+        config->trap = (int)trap_val;
+      }
         
       break;
         
     case 'u':
 
       /* set user to run as */
-      user = ( char * )XMALLOC( (sizeof(char)*MAX_USER_LEN)+1 );
-      XMEMSET( user, 0, (sizeof(char)*MAX_USER_LEN)+1 );
-      XSTRNCPY( user, optarg, MAX_USER_LEN );
+      if (strlen(optarg) >= MAX_USER_LEN) {
+        fprintf(stderr, "ERROR: username too long (max %d chars)\n", MAX_USER_LEN-1);
+        cleanup();
+        exit(EXIT_FAILURE);
+      }
+      user = ( char * )XMALLOC( MAX_USER_LEN );
+      XMEMSET( user, 0, MAX_USER_LEN );
+      XSTRNCPY( user, optarg, MAX_USER_LEN - 1 );
+      user[MAX_USER_LEN - 1] = '\0';
       if ( ( pwd_ent = getpwnam( user ) ) EQ NULL ) {
 	fprintf( stderr, "ERR - Unknown user [%s]\n", user );
 	endpwent();
@@ -233,9 +297,15 @@ int main(int argc, char *argv[]) {
     case 'g':
 
       /* set gid to run as */
-      group = ( char * )XMALLOC( (sizeof(char)*MAX_GROUP_LEN)+1 );
-      XMEMSET( group, 0, (sizeof(char)*MAX_GROUP_LEN)+1 );
-      XSTRNCPY( group, optarg, MAX_GROUP_LEN );
+      if (strlen(optarg) >= MAX_GROUP_LEN) {
+        fprintf(stderr, "ERROR: group name too long (max %d chars)\n", MAX_GROUP_LEN-1);
+        cleanup();
+        exit(EXIT_FAILURE);
+      }
+      group = ( char * )XMALLOC( MAX_GROUP_LEN );
+      XMEMSET( group, 0, MAX_GROUP_LEN );
+      XSTRNCPY( group, optarg, MAX_GROUP_LEN - 1 );
+      group[MAX_GROUP_LEN - 1] = '\0';
       if ( ( grp_ent = getgrnam( group ) ) EQ NULL ) {
 	fprintf( stderr, "ERR - Unknown group [%s]\n", group );
 	endgrent();
@@ -262,12 +332,14 @@ int main(int argc, char *argv[]) {
   /* set default options */
   if ( config->key_file EQ NULL ) {
     config->key_file = ( char * )XMALLOC( strlen( KEYFILE ) + 1 );
-    XSTRNCPY( config->key_file, KEYFILE, strlen( KEYFILE ) );   
+    XSTRNCPY( config->key_file, KEYFILE, strlen( KEYFILE ) );
+    config->key_file[strlen( KEYFILE )] = '\0';
   }
 
   if ( config->log_file EQ NULL ) {
     config->log_file = ( char * )XMALLOC( strlen( LOG_FILE ) + 1 );
-    XSTRNCPY( config->log_file, LOG_FILE, strlen( LOG_FILE ) );   
+    XSTRNCPY( config->log_file, LOG_FILE, strlen( LOG_FILE ) );
+    config->log_file[strlen( LOG_FILE )] = '\0';
   }
 
   if ( config->tcpPort EQ 0 )
@@ -276,11 +348,20 @@ int main(int argc, char *argv[]) {
   if ( pid_file EQ NULL ) {
     pid_file = ( char * )XMALLOC( strlen( PID_FILE ) + 1 );
     XSTRNCPY( pid_file, PID_FILE, strlen( PID_FILE ) );
+    pid_file[strlen( PID_FILE )] = '\0';
   }
 
   if ( config->listen_addr EQ NULL ) {
     config->listen_addr = ( char * )XMALLOC( strlen( LISTENADDR ) + 1 );
     XSTRNCPY( config->listen_addr, LISTENADDR, strlen( LISTENADDR ) );
+    config->listen_addr[strlen( LISTENADDR )] = '\0';
+  }
+  
+  /* validate configuration parameters */
+  if ( access( config->key_file, R_OK ) != 0 ) {
+    display( LOG_ERR, "Cannot read key file [%s]: %s", config->key_file, strerror(errno) );
+    cleanup();
+    exit( EXIT_FAILURE );
   }
   
 #ifdef DEBUG
@@ -352,13 +433,23 @@ int main(int argc, char *argv[]) {
       /* reset umask */
       umask( 0027 );
 
-      /* stir randoms if used */
-#ifdef BUILD32BIT
-      srand((uint32_t)**main + (uint32_t)&argc + (uint32_t)time(NULL));
-#else // 64bit
-      srand((uint64_t)**main + (uint64_t)&argc + (uint64_t)time(NULL));
-#endif      
-      srand(rand());
+      /* stir randoms if used - use secure random source */
+      {
+        int urandom_fd = open("/dev/urandom", O_RDONLY);
+        if (urandom_fd >= 0) {
+          unsigned int seed;
+          if (read(urandom_fd, &seed, sizeof(seed)) == sizeof(seed)) {
+            srand(seed);
+          } else {
+            /* fallback to time-based if urandom fails */
+            srand((unsigned int)time(NULL) ^ (unsigned int)getpid());
+          }
+          close(urandom_fd);
+        } else {
+          /* fallback to time-based if no urandom */
+          srand((unsigned int)time(NULL) ^ (unsigned int)getpid());
+        }
+      }
       
       /* done forking off */
 
@@ -514,9 +605,29 @@ void drop_privileges( void ) {
   }
 #endif
 
-  /* verify things are good */
-  if ( config->gid != oldgid && ( setegid( oldgid ) != FAILED || getegid() != config->gid ) ) abort();
-  if ( config->uid != olduid && ( seteuid( olduid ) != FAILED || geteuid() != config->uid ) ) abort();
+  /* verify privilege drop was successful */
+  if ( config->gid != oldgid ) {
+    if ( getegid() != config->gid ) {
+      display( LOG_ERR, "Failed to drop group privileges: expected %d, got %d", config->gid, getegid() );
+      abort();
+    }
+    /* test that we cannot regain old privileges */
+    if ( setegid( oldgid ) == 0 ) {
+      display( LOG_ERR, "Security error: able to regain old group privileges" );
+      abort();
+    }
+  }
+  if ( config->uid != olduid ) {
+    if ( geteuid() != config->uid ) {
+      display( LOG_ERR, "Failed to drop user privileges: expected %d, got %d", config->uid, geteuid() );
+      abort();
+    }
+    /* test that we cannot regain old privileges */
+    if ( seteuid( olduid ) == 0 ) {
+      display( LOG_ERR, "Security error: able to regain old user privileges" );
+      abort();
+    }
+  }
 }
 
 /****
@@ -619,11 +730,8 @@ PRIVATE void cleanup( void ) {
  ****/
 
 void sigint_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  /* do a calm shutdown as time and pcap_loop permit */
+  /* do a calm shutdown as time permits */
   quit = TRUE;
-  signal( signo, sigint_handler );
 }
 
 /****
@@ -633,11 +741,8 @@ void sigint_handler( int signo ) {
  ****/
 
 void sigterm_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  /* do a calm shutdown as time and pcap_loop permit */
+  /* do a calm shutdown as time permits */
   quit = TRUE;
-  signal( signo, sigterm_handler );
 }
 
 /****
@@ -648,11 +753,8 @@ void sigterm_handler( int signo ) {
 
 #ifndef MINGW
 void sighup_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
   /* time to rotate logs and check the config */
   reload = TRUE;
-  signal( SIGHUP, sighup_handler );
 }
 #endif
 
@@ -663,14 +765,11 @@ void sighup_handler( int signo ) {
  ****/
 
 void sigsegv_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  fprintf( stderr, "ERR - Caught a sig%d, shutting down fast\n", signo );
-
-  cleanup();
-#ifdef MEM_DEBUG
-  XFREE_ALL();
-#endif
+  /* avoid calling non-async-signal-safe functions in signal handler */
+  static const char msg[] = "ERR - Caught SIGSEGV, shutting down\n";
+  ssize_t result = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  (void)result; /* suppress unused variable warning */
+  
   /* core out */
   abort();
 }
@@ -682,14 +781,11 @@ void sigsegv_handler( int signo ) {
  ****/
 
 void sigbus_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  fprintf( stderr, "ERR - Caught a sig%d, shutting down fast\n", signo );
-
-  cleanup();
-#ifdef MEM_DEBUG
-  XFREE_ALL();
-#endif
+  /* avoid calling non-async-signal-safe functions in signal handler */
+  static const char msg[] = "ERR - Caught SIGBUS, shutting down\n";
+  ssize_t result = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  (void)result; /* suppress unused variable warning */
+  
   /* core out */
   abort();
 }
@@ -701,14 +797,11 @@ void sigbus_handler( int signo ) {
  ****/
 
 void sigill_handler ( int signo ) {
-  signal( signo, SIG_IGN );
-
-  fprintf( stderr, "ERR - Caught a sig%d, shutting down fast\n", signo );
-
-  cleanup();
-#ifdef MEM_DEBUG
-  XFREE_ALL();
-#endif
+  /* avoid calling non-async-signal-safe functions in signal handler */
+  static const char msg[] = "ERR - Caught SIGILL, shutting down\n";
+  ssize_t result = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  (void)result; /* suppress unused variable warning */
+  
   /* core out */
   abort();
 }
@@ -720,14 +813,11 @@ void sigill_handler ( int signo ) {
  ****/
 
 void sigfpe_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  fprintf( stderr, "ERR - Caught a sig%d, shutting down fast\n", signo );
-
-  cleanup();
-#ifdef MEM_DEBUG
-  XFREE_ALL();
-#endif
+  /* avoid calling non-async-signal-safe functions in signal handler */
+  static const char msg[] = "ERR - Caught SIGFPE, shutting down\n";
+  ssize_t result = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  (void)result; /* suppress unused variable warning */
+  
   /* core out */
   abort();
 }
@@ -739,19 +829,7 @@ void sigfpe_handler( int signo ) {
  *****/
 
 void ctime_prog( int signo ) {
-  time_t ret;
-
-  /* disable SIGALRM */
-  signal( SIGALRM, SIG_IGN );
-  /* update current time */
-  if ( ( ret = time( &config->current_time ) ) EQ FAILED ) {
-    display( LOG_ERR, "Unable to update time [%d]", errno );
-  } else if ( ret != config->current_time ) {
-    display( LOG_WARNING, "Time update inconsistent [%d] [%d]", ret, config->current_time );
-  }
-
-  /* reset SIGALRM */
-  signal( SIGALRM, ctime_prog );
-  /* reset alarm */
-  alarm( 5 );
+  /* just update time, avoid complex operations in signal handler */
+  time(&config->current_time);
+  alarm(5);
 }

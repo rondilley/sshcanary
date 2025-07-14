@@ -18,9 +18,32 @@ passwords at the same time.
 
 ## Implimentation
 
+Below are the options that sshcanaryd supports.
+
+```
+sshcanaryd v0.8 [Jul 14 2025 - 15:38:53]
+
+syntax: sshcanaryd [options]
+ -c|--chroot {dir}    chroot to {dir}
+ -d|--debug {lvl}     enable debugging info (0-9)
+ -D|--daemon          run in the background
+ -h|--help            this info
+ -k|--key {fname}     filename where ssh key is stored
+ -l|--log {fname}     filename where events will be logged
+ -L|--listen {addr}   address to listen on
+ -p|--port {portnum}  port to listen on (default:22)
+ -P|--pid {fname}     filename where pid is stored
+ -t|--trap {freq}     randomly report success (default:1000)
+ -u|--user {uname}    user to run as
+ -g|--group {gname}   group to run as
+ -v|--version         display version information
+ ```
+
 You must first generate a server key for sshcanary to present when clients connect.
 
-`% ssh-keygen -t rsa -f server.key`
+```sh
+% ssh-keygen -t rsa -f server.key
+```
 
 If you want to run sshcanary as a non-privileged user or in conjuntion with a real 
 ssh server, you can use iptables to forward connections to sshcanary on an alternate 
@@ -28,7 +51,9 @@ port.
 
 The following forwards all inbound ssh connections destined for TCP/22 to TCP/2222.
 
-`# /sbin/iptables -A PREROUTING -t nat -p tcp --dport 22 -j REDIRECT --to-port 2222`
+```sh
+% sudo /sbin/iptables -A PREROUTING -t nat -p tcp --dport 22 -j REDIRECT --to-port 2222
+```
 
 When you start sshcanary, use -p 2222 or --port 2222 and all inbound ssh connections 
 will be forwarded to your sshcanary.
@@ -38,19 +63,27 @@ If you want to allow local connections to a real ssh server from your trusted ne
 sshcanary, you can use iptables to forward connections if they don't originate on 
 your trusted network.
 
-`# /sbin/iptables -A PREROUTING -t nat -p tcp -s ! 192.168.10.0/24 --dport 22 -j REDIRECT --to-port 2222`
+```sh
+% sudo /sbin/iptables -A PREROUTING -t nat -p tcp -s ! 192.168.10.0/24 --dport 22 -j REDIRECT --to-port 2222
+```
 
 A simple and dangerous way to run sshcanary is on the default ssh port as root.
 
-`# sshcanaryd -l /var/sshcanary/server.log -k /var/sshcanary/server.key`
+```sh
+% sudo sshcanaryd -l /var/sshcanary/server.log -k /var/sshcanary/server.key
+```
 
 A better way to run sshcanary is to set an effective UID/GID using the -u|--user and -g|--group options as shown below.
 
-`# sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key`
+```sh
+% sudo sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key
+```
 
 The installation includes an RC script for Linux that starts sshcanary in the above fashion but also enables random "traps" where sshcanary acts like the authentication was successful as seen below.
 
-`# sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key -t 1000`
+```sh
+% sudo sshcanaryd -p 2222 -u sshcanary -g sshcanary -l /var/sshcanary/server.log -k /var/sshcanary/server.key -t 1000
+```
 
 Logging is done in two places, system related events are logged to syslog and authentication events are logged to the specific log file as shown below.
 

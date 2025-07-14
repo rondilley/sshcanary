@@ -2,7 +2,7 @@
  *
  * Description: sshcanary Function Headers
  * 
- * Copyright (c) 2021, Ron Dilley
+ * Copyright (c) 2025, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -47,13 +47,13 @@
 # include <config.h>
 #endif
 
-#include <sysdep.h>
+#include "../include/sysdep.h"
 
 #ifndef __SYSDEP_H__
 # error something is messed up
 #endif
 
-#include <common.h>
+#include "../include/common.h"
 #include "util.h"
 #include "mem.h"
 
@@ -87,13 +87,7 @@ struct connection {
  ****/
 
 int startSshCanary( void );
-static int listener_cleanup(void);
-static void wrapup(void);
-static int get_utc(struct connection *c);
-static int *get_client_ip(struct connection *c);
-static int log_attempt(struct connection *c, int message_type);
 char *hash2hex(const unsigned char *hash, char *hashStr, int hLen ) ;
-
 int handle_auth(ssh_session session);
 
 #endif /* SSHCANARY_DOT_H */

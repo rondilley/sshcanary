@@ -12,8 +12,15 @@ AC_PROG_CC
 dnl make /usr/local as the default install dir
 AC_PREFIX_DEFAULT(/usr/local)
 
-CFLAGS="${CFLAGS} -I. -I.. -I../include"
-LDFLAGS="${LDFLAGS}"
+# Security hardening flags
+SECURITY_CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE -Wformat -Wformat-security"
+SECURITY_LDFLAGS="-pie -Wl,-z,relro -Wl,-z,now"
+
+# Warning flags
+WARNING_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes"
+
+CFLAGS="${CFLAGS} -I. -I.. -I../include ${SECURITY_CFLAGS} ${WARNING_CFLAGS}"
+LDFLAGS="${LDFLAGS} ${SECURITY_LDFLAGS}"
 
 SPLINT="no"
 AC_ARG_ENABLE(splint,
@@ -27,12 +34,18 @@ AC_ARG_ENABLE(debug,
     [  --enable-debug          Enable debugging],
     [ if test "$GCC" = yes; then
           DEBUG="yes"
-          CFLAGS="${CFLAGS} -DDEBUG -ggdb"
+          CFLAGS="${CFLAGS} -DDEBUG -ggdb -O0"
+          # Remove optimization and some hardening for debugging
+          SECURITY_CFLAGS=`echo $SECURITY_CFLAGS | sed 's/-D_FORTIFY_SOURCE=2//'`
       else
           DEBUG="yes"
           CFLAGS="${CFLAGS} -DDEBUG"
       fi
-    ],)
+    ],[if test "$GCC" = yes; then
+          # Add optimization for release builds
+          CFLAGS="${CFLAGS} -O2"
+      fi
+    ])
 
 MEM_DEBUG="no"
 AC_ARG_ENABLE(memdebug,
@@ -310,6 +323,9 @@ fi
 AM_CONFIG_HEADER(include/config.h)
 AC_PROG_INSTALL
 AC_OUTPUT(Makefile src/Makefile sshcanaryd.1)
+
+echo "Security hardening flags  : ${SECURITY_CFLAGS}"
+echo "Warning flags            : ${WARNING_CFLAGS}"
 
 BINDIR=`eval echo ${bindir}`; BINDIR=`eval echo ${BINDIR}`;
 MANDIR=`eval echo ${mandir}/${mansubdir}`; MANDIR=`eval echo ${MANDIR}`;

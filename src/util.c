@@ -2,7 +2,7 @@
  *
  * Description: Utility Functions
  * 
- * Copyright (c) 2009-2021, Ron Dilley
+ * Copyright (c) 2009-2025, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -36,6 +36,8 @@
  ****/
 
 #include "util.h"
+#include <stdarg.h>
+#include <string.h>
 
 /****
  *
@@ -158,13 +160,26 @@ int display( int level, char *format, ... ) {
   PRIVATE va_list args;
   PRIVATE char tmp_buf[SYSLOG_MAX];
   PRIVATE int i;
+  PRIVATE int ret;
 
   va_start( args, format );
-  vsprintf( tmp_buf, format, args );
-  if ( tmp_buf[strlen(tmp_buf)-1] == '\n' ) {
-    tmp_buf[strlen(tmp_buf)-1] = 0;
-  }
+  ret = vsnprintf( tmp_buf, sizeof(tmp_buf), format, args );
   va_end( args );
+  
+  if (ret < 0) {
+    /* encoding error */
+    strncpy(tmp_buf, "[encoding error in log message]", sizeof(tmp_buf) - 1);
+    tmp_buf[sizeof(tmp_buf) - 1] = '\0';
+  } else if (ret >= sizeof(tmp_buf)) {
+    /* truncated */
+    tmp_buf[sizeof(tmp_buf) - 1] = '\0';
+  }
+  
+  /* remove trailing newline if present */
+  size_t len = strlen(tmp_buf);
+  if (len > 0 && tmp_buf[len-1] == '\n') {
+    tmp_buf[len-1] = '\0';
+  }
 
   if ( config->mode != MODE_INTERACTIVE ) {
     /* display info via syslog */
@@ -244,14 +259,16 @@ int create_pid_file( const char *filename ) {
 
 #ifndef O_CLOEXEC
     /* use fcntl if O_CLOEXEC not supported */
-    flags = fcntl( fd, F_GETFD );
+    int flags = fcntl( fd, F_GETFD );
     if ( flags EQ FAILED ) {
         display( LOG_ERR, "Unable to get flags" );
+        close(fd);
         return( EXIT_FAILURE );
     }
     flags |= FD_CLOEXEC;
     if ( fcntl(fd, F_SETFD, flags ) EQ FAILED ) {
         display( LOG_ERR, "Unable to set flags" );
+        close(fd);
         return( EXIT_FAILURE );
     }
 #endif
@@ -266,18 +283,21 @@ int create_pid_file( const char *filename ) {
            display( LOG_ERR, "Process is already running" );
        else
            display( LOG_ERR, "Unable to lock PID file [%s]", filename );
+       close(fd);
        return( EXIT_FAILURE );
     }
 
     /* write the PID to the file */
-    if (ftruncate( fd, 0 ) EQ -FAILED ) {
+    if (ftruncate( fd, 0 ) EQ FAILED ) {
         display( LOG_ERR, "Unable to empty PID file [%s]", filename );
+        close(fd);
         return( EXIT_FAILURE );
     }
     
     snprintf( buf, sizeof( buf ), "%ld\n", (long)getpid() );
-    if ( write( fd, buf, strlen(buf) ) != strlen( buf ) ) {
+    if ( write( fd, buf, strlen(buf) ) != (ssize_t)strlen( buf ) ) {
         display( LOG_ERR, "Unable to write PID to file [%s]", filename );
+        close(fd);
         return( EXIT_FAILURE );
     }
  

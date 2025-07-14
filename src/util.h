@@ -2,7 +2,7 @@
  *
  * Description: Utility Function Headers
  * 
- * Copyright (c) 2009-2021, Ron Dilley
+ * Copyright (c) 2009-2025, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -43,13 +43,13 @@
 # include <config.h>
 #endif
 
-#include <sysdep.h>
+#include "../include/sysdep.h"
 
 #ifndef __SYSDEP_H__
 # error something is messed up
 #endif
 
-#include <common.h>
+#include "../include/common.h"
 #include <sys/types.h>
 #include <dirent.h>
 #include "mem.h"
@@ -70,8 +70,6 @@ int display( int level, char *format, ... );
 int open_devnull( int fd );
 int is_dir_safe( const char *dir );
 int create_pid_file( const char *filename );
-static int safe_open( const char *filename );
-static void cleanup_pid_file( const char *filename );
 void sanitize_environment( void );
 
 #endif /* end of UTIL_DOT_H */
